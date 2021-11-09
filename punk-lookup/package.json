@@ -1,0 +1,17 @@
+{
+  "name": "punk-lookup",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "type":"module",
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@ensdomains/ensjs": "^2.0.1",
+    "csv-parser": "^3.0.0",
+    "eth-ens-namehash": "^2.0.8"
+  }
+}
