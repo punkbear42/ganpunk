@@ -11,7 +11,7 @@ def save_plot(examples, n, epoch=-1):
 	# plot images
 	for i in range(n * n):
 		# define subplot
-		pyplot.subplot(n, m, 1 + i)
+		pyplot.subplot(n, n, 1 + i)
 		# turn off axis
 		pyplot.axis('off')
 		# plot raw pixel data
