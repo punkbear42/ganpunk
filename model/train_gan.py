@@ -22,7 +22,7 @@ import os
 
 img_height = 24
 img_width = 24
-batch_size = 500
+batch_size = 2000
 
 # define the standalone discriminator model
 def define_discriminator(in_shape=(img_height,img_width,4)):
@@ -140,9 +140,9 @@ def summarize_performance(epoch, batch, g_model, d_model, dataset, latent_dim, n
 	# summarize discriminator performance
 	print('Accuracy real: %.0f%%, fake: %.0f%%' % (acc_real*100, acc_fake*100))
 	# save plot
-	save_plot(x_fake, 10)
+	save_plot(x_fake, 10, epoch)
 	# save the generator model tile file
-	filename = 'results/generator_model.h5'
+	filename = 'results/generator_model_e_%03d.h5' % (epoch))
 	g_model.save(filename)
 
 # train the generator and discriminator

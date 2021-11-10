@@ -6,14 +6,10 @@ import os
 import os
 
 # create and save a plot of generated images (reversed grayscale)
-def save_plot(examples, n, m=-1):
-	if m == -1:
-		m = n
+def save_plot(examples, n, epoch=-1):
 	examples = (examples + 1) / 2.0
-	print(n)
-	print(m)
 	# plot images
-	for i in range(m * n):
+	for i in range(n * n):
 		# define subplot
 		pyplot.subplot(n, m, 1 + i)
 		# turn off axis
@@ -21,7 +17,7 @@ def save_plot(examples, n, m=-1):
 		# plot raw pixel data
 		pyplot.imshow(examples[i])
 	# save plot to file
-	filename = 'results/generated_plot.png'
+	filename = 'results/generated_plot_e_%03d.png' % (epoch)
 	pyplot.savefig(filename)
 	pyplot.close()
 	# TOKEN = os.getenv('TOKEN')

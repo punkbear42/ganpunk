@@ -5,7 +5,7 @@ def evaluate(epoch, latent_dim, n_samples):
 	filename = 'results/generator_model_e_1000_b_1000_fulloversample.h5'
 	g_model = keras.models.load_model(filename)
 	x_fake, y_fake = generate_fake_samples(g_model, latent_dim, n_samples)
-	save_plot(x_fake, 10, 10)
+	save_plot(x_fake, 10, epoch)
 
 n_samples = 1000
 latent_dim = 100
