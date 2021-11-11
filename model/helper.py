@@ -27,14 +27,15 @@ def save_plot(examples, n, epoch=-1):
 	#	os.system("git commit --amend")
 	#	os.system('git push https://' + TOKEN + '@github.com/' + REPO + '.git')
 
-def save_punk(punk, epoch, batch, n=10):
+def save_punk(punk):
 	# turn off axis
 	# pyplot.axis('off')
 	# plot raw pixel data
 	# pyplot.imshow(punk)
 	# print(punk)
-	filename = 'results/generated_plot_e%03d_%03d.png' % (epoch+1, batch)
-	pyplot.imsave(filename, punk)
+	punk = (punk + 1) / 2.0
+	filename = 'results/generated_punk.png'
+	pyplot.imsave(filename, punk[0])
 	# pyplot.close()
 
 # generate points in latent space as input for the generator
