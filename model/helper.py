@@ -1,6 +1,7 @@
 from numpy.random import randn
 from numpy.random import randint
 from numpy import zeros
+from numpy import tile
 from matplotlib import pyplot
 import os
 import os
@@ -46,6 +47,23 @@ def generate_latent_points(latent_dim, n_samples):
 	x_input = x_input.reshape(n_samples, latent_dim)
 	return x_input
 
+	# generate points in latent space as input for the generator
+def generate_similar_latent_points(latent_dim, n_samples):
+	# generate points in the latent space
+	x_input = randn(latent_dim * 1)
+	x_input = tile(x_input, n_samples)
+	
+	for x in range(100):
+		x_input[x * 100] = x_input[x * 100] + x
+		x_input[x * 99] = x_input[x * 99] + x
+		x_input[x * 98] = x_input[x * 98] + x
+	
+
+	# reshape into a batch of inputs for the network
+	x_input = x_input.reshape(n_samples, latent_dim)
+	print(x_input)
+	return x_input
+
 # use the generator to generate n fake examples, with class labels
 def generate_fake_samples(g_model, latent_dim, n_samples):
 	# generate points in latent space
@@ -53,10 +71,15 @@ def generate_fake_samples(g_model, latent_dim, n_samples):
 	# predict outputs
 	X = g_model.predict(x_input)	
 	
-	# print(X)
-	# print ('after')
-	# print(X)
-	# print(X.shape)
-	# create 'fake' class labels (0)
+	y = zeros((n_samples, 1))
+	return X, y
+
+# use the generator to generate n fake examples, with class labels
+def generate_similar_fake_samples(g_model, latent_dim, n_samples):
+	# generate points in latent space
+	x_input = generate_similar_latent_points(latent_dim, n_samples)
+	# predict outputs
+	X = g_model.predict(x_input)	
+	
 	y = zeros((n_samples, 1))
 	return X, y
