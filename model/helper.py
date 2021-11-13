@@ -28,14 +28,13 @@ def save_plot(examples, n, epoch=-1):
 	#	os.system("git commit --amend")
 	#	os.system('git push https://' + TOKEN + '@github.com/' + REPO + '.git')
 
-def save_punk(punk):
+def save_punk(punk, filename = 'results/generated_punk.png'):
 	# turn off axis
 	# pyplot.axis('off')
 	# plot raw pixel data
 	# pyplot.imshow(punk)
 	# print(punk)
 	punk = (punk + 1) / 2.0
-	filename = 'results/generated_punk.png'
 	pyplot.imsave(filename, punk[0])
 	# pyplot.close()
 
