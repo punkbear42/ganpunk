@@ -193,10 +193,9 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
 
             current_batch = current_batch + 1
             lastDataset = j
-
-            summarize_performance(output_file, current_epoch + 1, d_loss,
-                                  g_loss, g_model, d_model, lastDataset,
-                                  latent_dim, batch_size)
+        
+        if current_epoch % 2 == 0:
+            summarize_performance(output_file, current_epoch + 1, d_loss, g_loss, g_model, d_model, lastDataset, latent_dim, batch_size)
 
 
 def parse_args():
