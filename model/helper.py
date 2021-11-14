@@ -41,7 +41,7 @@ def save_punk(punk, filename = 'results/generated_punk.png'):
 # generate points in latent space as input for the generator
 def generate_latent_points(latent_dim, n_samples):
 	# generate points in the latent space
-	x_input = randn(latent_dim * n_samples)
+	x_input = randn(latent_dim * n_samples)	
 	# reshape into a batch of inputs for the network
 	x_input = x_input.reshape(n_samples, latent_dim)
 	return x_input
@@ -67,7 +67,7 @@ def generate_similar_latent_points(latent_dim, n_samples):
 def generate_fake_samples(g_model, latent_dim, n_samples):
 	# generate points in latent space
 	x_input = generate_latent_points(latent_dim, n_samples)
-	# predict outputs
+	# predict outputs	
 	X = g_model.predict(x_input)	
 	
 	y = zeros((n_samples, 1))
