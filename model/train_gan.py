@@ -166,12 +166,12 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
         current_batch = 0
         lastDataset = 0
         for j in dataset:
-            # smote
-            sm = RandomOverSampler(random_state=42)
-            reshaped = j[0].numpy().reshape(
-                j[0].numpy().shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
-            X_real, _ = sm.fit_resample(reshaped, j[1])
-            X_real = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
+            # sm = RandomOverSampler(random_state=42)
+            X_real = j[0]
+            # reshaped = j[0].numpy().reshape(
+            #     j[0].numpy().shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
+            # X_real, _ = sm.fit_resample(reshaped, j[1])
+            # X_real = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
             # normalize
             X_real = (X_real - 127.5) / 127.5  # -1, 1
             # generate 'fake' examples
