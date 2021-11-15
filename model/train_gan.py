@@ -1,5 +1,4 @@
 from numpy import ones
-from numpy import vstack
 from matplotlib import pyplot
 import argparse
 
@@ -126,8 +125,9 @@ def generate_real_samples(dataset, n_samples):
     return dataset, y
 
 
-def summarize_performance(output_file, epoch, d_loss, g_loss,
-                          g_model, d_model, dataset, latent_dim, n_samples):
+def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss,
+                          g_model, d_model, dataset, latent_dim, n_samples,
+                          save_model=False):
     # prepare real samples
     X_real, y_real = generate_real_samples(dataset[0], dataset[0].shape[0])
     # evaluate discriminator on real examples
@@ -140,23 +140,26 @@ def summarize_performance(output_file, epoch, d_loss, g_loss,
     print('Accuracy real: %.0f%%, fake: %.0f%%' %
           (acc_real * 100, acc_fake * 100))
 
+    d_loss = (d_loss_real + d_loss_fake) / 2
     with open(f'{output_file}_training.txt', 'a') as file:
-        file.write(f'{epoch},{d_loss},{g_loss},{acc_real},{acc_fake}\n')
+        file.write(
+            f'{epoch},{d_loss},{d_loss_real},{d_loss_fake},{g_loss},{acc_real},{acc_fake}\n')
 
-    # save plot
-    save_plot(x_fake, 10, epoch, output_file)
-    # save the generator model tile file
-    filename = f'{output_file}_{epoch}.h5'
-    g_model.save(filename)
+    if save_model:
+        # save plot
+        save_plot(x_fake, 10, epoch, output_file)
+        # save the generator model tile file
+        filename = f'{output_file}_{epoch}.h5'
+        g_model.save(filename)
 
 
 def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
-          n_epochs, batch_size):
+          n_epochs, batch_size, checkpoint_every_epochs=50):
     """Train the generator and discriminator."""
 
     with open(f'{output_file}_training.txt', 'w') as file:
         file.write(
-            'Epoch,Discriminator loss,Generator loss,Accuracy real,Accuracy fake\n')
+            'Epoch,Discriminator loss,Discriminator loss (Real),Discriminator loss (Fake),Generator loss,Accuracy real,Accuracy fake\n')
 
     for current_epoch in range(n_epochs):
         # enumerate batches over the training set
@@ -177,10 +180,9 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
 
             _, y_real_ = generate_real_samples(j[0], X_real.shape[0])
 
-            # create training set for the discriminator
-            X, y = vstack((X_real, X_fake)), vstack((y_real_, y_fake))
             # update discriminator model weights
-            d_loss, _ = d_model.train_on_batch(X, y)
+            d_loss_real, _ = d_model.train_on_batch(X_real, y_real_)
+            d_loss_fake, _ = d_model.train_on_batch(X_fake, y_fake)
             # prepare points in latent space as input for the generator
             X_gan = generate_latent_points(latent_dim, batch_size)
             # create inverted labels for the fake samples
@@ -188,14 +190,18 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
             # update the generator via the discriminator's error
             g_loss = gan_model.train_on_batch(X_gan, y_gan)
             # summarize loss on this batch
-            print('epoch=%d, batch=%d, d=%.3f, g=%.3f' %
-                  (current_epoch + 1, current_batch + 1, d_loss, g_loss))
+            print('epoch=%d, batch=%d, d_real=%.3f, d_fake=%.3f, g=%.3f' %
+                  (current_epoch + 1, current_batch + 1, d_loss_real,
+                   d_loss_fake, g_loss))
 
             current_batch = current_batch + 1
             lastDataset = j
-        
-        if current_epoch % 2 == 0:
-            summarize_performance(output_file, current_epoch + 1, d_loss, g_loss, g_model, d_model, lastDataset, latent_dim, batch_size)
+
+        summarize_performance(output_file, current_epoch + 1,
+                              d_loss_real, d_loss_fake,
+                              g_loss, g_model, d_model, lastDataset,
+                              latent_dim, batch_size,
+                              current_epoch % checkpoint_every_epochs == 0)
 
 
 def parse_args():
@@ -210,6 +216,7 @@ def parse_args():
     parser.add_argument("--learning_rate", default=0.0002, type=float)
     parser.add_argument("--beta_1", default=0.5, type=float)
     parser.add_argument("--latent_dimensions", type=int, default=100)
+    parser.add_argument("--checkpoint_every_epochs", type=int, default=50)
     parser.add_argument("--n_epochs", type=int, default=1000)
 
     return parser.parse_args()
@@ -231,4 +238,5 @@ if __name__ == '__main__':
     dataset = load_real_samples(args.batch_size)
     # train model
     train(args.output_file, g_model, d_model, gan_model, dataset,
-          args.latent_dimensions, args.n_epochs, args.batch_size)
+          args.latent_dimensions, args.n_epochs, args.batch_size,
+          args.checkpoint_every_epochs)
