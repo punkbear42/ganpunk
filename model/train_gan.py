@@ -126,7 +126,8 @@ def generate_real_samples(dataset, n_samples):
 
 
 def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss,
-                          g_model, d_model, dataset, latent_dim, n_samples):
+                          g_model, d_model, dataset, latent_dim, n_samples,
+                          save_model=False):
     # prepare real samples
     X_real, y_real = generate_real_samples(dataset[0], dataset[0].shape[0])
     # evaluate discriminator on real examples
@@ -144,11 +145,12 @@ def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss,
         file.write(
             f'{epoch},{d_loss},{d_loss_real},{d_loss_fake},{g_loss},{acc_real},{acc_fake}\n')
 
-    # save plot
-    save_plot(x_fake, 10, epoch, output_file)
-    # save the generator model tile file
-    filename = f'{output_file}_{epoch}.h5'
-    g_model.save(filename)
+    if save_model:
+        # save plot
+        save_plot(x_fake, 10, epoch, output_file)
+        # save the generator model tile file
+        filename = f'{output_file}_{epoch}.h5'
+        g_model.save(filename)
 
 
 def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
@@ -195,11 +197,11 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
             current_batch = current_batch + 1
             lastDataset = j
 
-        if current_epoch % checkpoint_every_epochs == 0:
-            summarize_performance(output_file, current_epoch + 1,
-                                  d_loss_real, d_loss_fake,
-                                  g_loss, g_model, d_model, lastDataset,
-                                  latent_dim, batch_size)
+        summarize_performance(output_file, current_epoch + 1,
+                              d_loss_real, d_loss_fake,
+                              g_loss, g_model, d_model, lastDataset,
+                              latent_dim, batch_size,
+                              current_epoch % checkpoint_every_epochs == 0)
 
 
 def parse_args():
