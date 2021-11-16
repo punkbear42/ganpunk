@@ -9,4 +9,9 @@
 pip install imblearn
 pip install matplotlib
 
+# training
+
+ - without classees: male, female, human
+ - without over sampling
+
 
