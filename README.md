@@ -9,4 +9,9 @@
 pip install imblearn
 pip install matplotlib
 
+# training
+
+ epochs: 100 
+ batchsize: 256
+
 
