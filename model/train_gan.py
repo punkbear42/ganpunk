@@ -166,19 +166,19 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
         current_batch = 0
         lastDataset = 0
         for j in dataset:
-            # sm = RandomOverSampler(random_state=42)
-            X_real = j[0]
-            # reshaped = j[0].numpy().reshape(
-            #     j[0].numpy().shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
-            # X_real, _ = sm.fit_resample(reshaped, j[1])
-            # X_real = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
+            sm = RandomOverSampler(random_state=42)
+            
+            reshaped = j[0].numpy().reshape(
+                    j[0].numpy().shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
+            X_real, _ = sm.fit_resample(reshaped, j[1])
+            X_real = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
             # normalize
             X_real = (X_real - 127.5) / 127.5  # -1, 1
             # generate 'fake' examples
             X_fake, y_fake = generate_fake_samples(
-                g_model, latent_dim, batch_size)
+                g_model, latent_dim, X_real.shape[0])
 
-            _, y_real_ = generate_real_samples(j[0], X_real.shape[0])
+            _, y_real_ = generate_real_samples(X_real, X_real.shape[0])
 
             # update discriminator model weights
             d_loss_real, _ = d_model.train_on_batch(X_real, y_real_)
