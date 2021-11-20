@@ -49,17 +49,20 @@ def define_discriminator(in_shape=(IMG_HEIGHT, IMG_WIDTH, 4),
     opt = Adam(lr=lr, beta_1=beta_1)
     model.compile(loss='binary_crossentropy',
                   optimizer=opt, metrics=['accuracy'])
+    model.summary()
     return model
 
 
 def define_generator(latent_dim):
     """Define the standalone generator model."""
     model = Sequential()
-    # foundation for 4x4 image
-    n_nodes = 128 * 6 * 6
+    n_nodes = 256 * 3 * 3
     model.add(Dense(n_nodes, input_dim=latent_dim))
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((6, 6, 128)))
+    model.add(Reshape((3, 3, 256)))
+    model.add(Conv2DTranspose(
+        128, (4, 4), strides=(2, 2), padding='same'))  # 6x6
+    model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2DTranspose(
         128, (4, 4), strides=(2, 2), padding='same'))  # 12x12
     model.add(LeakyReLU(alpha=0.2))
