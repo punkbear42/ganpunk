@@ -1,10 +1,12 @@
 from numpy import ones
 from matplotlib import pyplot
 import argparse
-
+import numpy
 import tensorflow as tf
 print('version tensorflow')
 print(tf.version.VERSION)
+from numpy.random import rand
+from numpy.random import randint
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
@@ -104,32 +106,40 @@ def show_dataset(train_data):
 
 def load_punks(batch_size):
     train_data = image_dataset_from_directory(
-        './punks-classified',
-        labels='inferred',
-        label_mode='int',
+        './punks',
+        label_mode=None,
         seed=123,
         image_size=(IMG_HEIGHT, IMG_WIDTH),
-        batch_size=batch_size,
-        color_mode='rgba')
+        batch_size=10000,
+        color_mode='rgba')    
 
-    return train_data
+    return next(iter(train_data)).numpy()
+
 
 
 def load_real_samples(batch_size):
     trainX = load_punks(batch_size)
     return trainX
 
-
 def generate_real_samples(dataset, n_samples):
-    y = ones((n_samples, 1))
-    return dataset, y
+	# choose random instances
+    ix = randint(0, dataset.shape[0], n_samples)
+	
+    # retrieve selected images
+    X = dataset[ix]
 
+	# generate 'real' class labels (1)
+
+	
+    y = ones((n_samples, 1))
+	
+    return X, y
 
 def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss,
                           g_model, d_model, dataset, latent_dim, n_samples,
                           save_model=False):
     # prepare real samples
-    X_real, y_real = generate_real_samples(dataset[0], dataset[0].shape[0])
+    X_real, y_real = generate_real_samples(dataset, n_samples)
     # evaluate discriminator on real examples
     _, acc_real = d_model.evaluate(X_real, y_real, verbose=0)
     # prepare fake examples
@@ -156,6 +166,9 @@ def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss,
 def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
           n_epochs, batch_size, checkpoint_every_epochs=50):
     """Train the generator and discriminator."""
+    
+    half_batch = int(batch_size / 2)
+    batch_per_epoch = int(dataset.shape[0] / batch_size)
 
     with open(f'{output_file}_training.txt', 'w') as file:
         file.write(
@@ -163,25 +176,18 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
 
     for current_epoch in range(n_epochs):
         # enumerate batches over the training set
-        current_batch = 0
-        lastDataset = 0
-        for j in dataset:
-            # sm = RandomOverSampler(random_state=42)
-            X_real = j[0]
-            # reshaped = j[0].numpy().reshape(
-            #     j[0].numpy().shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
-            # X_real, _ = sm.fit_resample(reshaped, j[1])
-            # X_real = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
-            # normalize
-            X_real = (X_real - 127.5) / 127.5  # -1, 1
-            # generate 'fake' examples
-            X_fake, y_fake = generate_fake_samples(
-                g_model, latent_dim, batch_size)
+                
+        for current_batch in range(batch_per_epoch):
 
-            _, y_real_ = generate_real_samples(j[0], X_real.shape[0])
+            X_fake, y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
+            
+            X_real, y_real = generate_real_samples(dataset, half_batch)
+
+            X_real = (X_real - 127.5) / 127.5  # -1, 1
+        
 
             # update discriminator model weights
-            d_loss_real, _ = d_model.train_on_batch(X_real, y_real_)
+            d_loss_real, _ = d_model.train_on_batch(X_real, y_real)
             d_loss_fake, _ = d_model.train_on_batch(X_fake, y_fake)
             # prepare points in latent space as input for the generator
             X_gan = generate_latent_points(latent_dim, batch_size)
@@ -191,15 +197,13 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
             g_loss = gan_model.train_on_batch(X_gan, y_gan)
             # summarize loss on this batch
             print('epoch=%d, batch=%d, d_real=%.3f, d_fake=%.3f, g=%.3f' %
-                  (current_epoch + 1, current_batch + 1, d_loss_real,
-                   d_loss_fake, g_loss))
+                (current_epoch + 1, current_batch + 1, d_loss_real,
+                d_loss_fake, g_loss))
+            
 
-            current_batch = current_batch + 1
-            lastDataset = j
-
-        summarize_performance(output_file, current_epoch + 1,
+        summarize_performance(output_file, current_epoch,
                               d_loss_real, d_loss_fake,
-                              g_loss, g_model, d_model, lastDataset,
+                              g_loss, g_model, d_model, dataset,
                               latent_dim, batch_size,
                               current_epoch % checkpoint_every_epochs == 0)
 
