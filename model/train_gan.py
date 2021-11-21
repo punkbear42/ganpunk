@@ -107,28 +107,64 @@ def show_dataset(train_data):
             break
 
 
-def load_punks(batch_size):
-    train_data = image_dataset_from_directory(
-        './punks-classified',
-        labels='inferred',
-        label_mode='int',
-        seed=123,
-        image_size=(IMG_HEIGHT, IMG_WIDTH),
-        batch_size=10000,
-        color_mode='rgba')
+def load_punks(batch_size, data_sampling=""):
+    if data_sampling == "":
+        # raw 10.000 are being loaded
+        train_data = image_dataset_from_directory(
+            './punks',
+            label_mode=None,
+            seed=123,
+            image_size=(IMG_HEIGHT, IMG_WIDTH),
+            batch_size=10000,
+            color_mode='rgba')
+        train_data = next(iter(train_data)).numpy()
 
-    return next(iter(train_data)) # this returns one single of all the classified punks
+    elif data_sampling == "BasicClassifier":
+        # classified punks are being loaded,
+        # punks are duplicated over multiple classes
+        # e.g a single punk can be found in the class "bear" and in the class "beanie".
+        train_data = image_dataset_from_directory(
+            './punks-classified',
+            labels='inferred',
+            label_mode='int',
+            seed=123,
+            image_size=(IMG_HEIGHT, IMG_WIDTH),
+            batch_size=30000000, # very high number so everything get into one batch
+            color_mode='rgba')
+        train_data = next(iter(train_data))
+        train_data = train_data[0].numpy()
 
+    elif data_sampling == "RandomOverSampler":
+        # same as BasicClassifier
+        # + RandomOverSampler: e.g it fixes imbalanced class (e.g if the class "bear" and "beanie" are imbalanced)
+        train_data = image_dataset_from_directory(
+            './punks-classified',
+            labels='inferred',
+            label_mode='int',
+            seed=123,
+            image_size=(IMG_HEIGHT, IMG_WIDTH),
+            batch_size=30000000, # very high number so everything get into one batch
+            color_mode='rgba')
+        train_data = next(iter(train_data))
 
+        data_punks = train_data[0].numpy()
+        label_punks = train_data[1].numpy()
 
-def load_real_samples(batch_size):
-    trainX = load_punks(batch_size)
-    return trainX
+        sm = RandomOverSampler(random_state=42)
+
+        reshaped = data_punks.reshape(
+            data_punks.shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
+        train_data, _ = sm.fit_resample(reshaped, label_punks)
+        train_data = train_data.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
+    
+    print(f'samples: {train_data.shape[0]}')
+
+    return train_data
 
 def generate_real_samples(dataset, n_samples):
 	# choose random instances
     ix = randint(0, dataset.shape[0], n_samples)
-	
+    
     # retrieve selected images
     X = dataset[ix]
 
@@ -174,17 +210,6 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
     with open(f'{output_file}_training.txt', 'w') as file:
         file.write(
             'Epoch,Discriminator loss,Discriminator loss (Real),Discriminator loss (Fake),Generator loss,Accuracy real,Accuracy fake\n')
-
-    data_punks = dataset[0].numpy()
-    label_punks = dataset[1].numpy()
-
-    sm = RandomOverSampler(random_state=42)
-    reshaped = data_punks.reshape(
-         data_punks.shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
-    X_real, _ = sm.fit_resample(reshaped, label_punks)
-    dataset = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
-    print('over sampled:')
-    print(X_real.shape)
 
     half_batch = int(batch_size / 2)
     batch_per_epoch = int(dataset.shape[0] / batch_size)
@@ -236,6 +261,7 @@ def parse_args():
     parser.add_argument("--latent_dimensions", type=int, default=100)
     parser.add_argument("--checkpoint_every_epochs", type=int, default=50)
     parser.add_argument("--n_epochs", type=int, default=1000)
+    parser.add_argument("--data_sampling", type=str, default="", choices=['RandomOverSampler', 'BasicClassifier'])
 
     return parser.parse_args()
 
@@ -253,7 +279,7 @@ if __name__ == '__main__':
                            beta_1=args.beta_1)
 
     # load image data
-    dataset = load_real_samples(args.batch_size)
+    dataset = load_punks(args.batch_size, args.data_sampling)
     # train model
     train(args.output_file, g_model, d_model, gan_model, dataset,
           args.latent_dimensions, args.n_epochs, args.batch_size,
