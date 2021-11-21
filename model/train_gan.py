@@ -109,14 +109,15 @@ def show_dataset(train_data):
 
 def load_punks(batch_size):
     train_data = image_dataset_from_directory(
-        './punks',
-        label_mode=None,
+        './punks-classified',
+        labels='inferred',
+        label_mode='int',
         seed=123,
         image_size=(IMG_HEIGHT, IMG_WIDTH),
         batch_size=10000,
-        color_mode='rgba')    
+        color_mode='rgba')
 
-    return next(iter(train_data)).numpy()
+    return next(iter(train_data)) # this returns one single of all the classified punks
 
 
 
@@ -138,17 +139,17 @@ def generate_real_samples(dataset, n_samples):
 	
     return X, y
 
-def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss,
+def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss, acc_real, acc_fake,
                           g_model, d_model, dataset, latent_dim, n_samples,
                           save_model=False):
     # prepare real samples
-    X_real, y_real = generate_real_samples(dataset, n_samples)
+    # X_real, y_real = generate_real_samples(dataset, n_samples)
     # evaluate discriminator on real examples
-    _, acc_real = d_model.evaluate(X_real, y_real, verbose=0)
+    # _, acc_real = d_model.evaluate(X_real, y_real, verbose=0)
     # prepare fake examples
     x_fake, y_fake = generate_fake_samples(g_model, latent_dim, n_samples)
     # evaluate discriminator on fake examples
-    _, acc_fake = d_model.evaluate(x_fake, y_fake, verbose=0)
+    # _, acc_fake = d_model.evaluate(x_fake, y_fake, verbose=0)
     # summarize discriminator performance
     print('Accuracy real: %.0f%%, fake: %.0f%%' %
           (acc_real * 100, acc_fake * 100))
@@ -170,12 +171,23 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
           n_epochs, batch_size, checkpoint_every_epochs=50):
     """Train the generator and discriminator."""
     
-    half_batch = int(batch_size / 2)
-    batch_per_epoch = int(dataset.shape[0] / batch_size)
-
     with open(f'{output_file}_training.txt', 'w') as file:
         file.write(
             'Epoch,Discriminator loss,Discriminator loss (Real),Discriminator loss (Fake),Generator loss,Accuracy real,Accuracy fake\n')
+
+    data_punks = dataset[0].numpy()
+    label_punks = dataset[1].numpy()
+
+    sm = RandomOverSampler(random_state=42)
+    reshaped = data_punks.reshape(
+         data_punks.shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
+    X_real, _ = sm.fit_resample(reshaped, label_punks)
+    dataset = X_real.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
+    print('over sampled:')
+    print(X_real.shape)
+
+    half_batch = int(batch_size / 2)
+    batch_per_epoch = int(dataset.shape[0] / batch_size)
 
     for current_epoch in range(n_epochs):
         # enumerate batches over the training set
@@ -185,13 +197,13 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
             X_fake, y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
             
             X_real, y_real = generate_real_samples(dataset, half_batch)
-
+            # normalize
             X_real = (X_real - 127.5) / 127.5  # -1, 1
         
 
             # update discriminator model weights
-            d_loss_real, _ = d_model.train_on_batch(X_real, y_real)
-            d_loss_fake, _ = d_model.train_on_batch(X_fake, y_fake)
+            d_loss_real, acc_real = d_model.train_on_batch(X_real, y_real)
+            d_loss_fake, acc_fake = d_model.train_on_batch(X_fake, y_fake)
             # prepare points in latent space as input for the generator
             X_gan = generate_latent_points(latent_dim, batch_size)
             # create inverted labels for the fake samples
@@ -202,11 +214,10 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
             print('epoch=%d, batch=%d, d_real=%.3f, d_fake=%.3f, g=%.3f' %
                 (current_epoch + 1, current_batch + 1, d_loss_real,
                 d_loss_fake, g_loss))
-            
-
+        
         summarize_performance(output_file, current_epoch,
                               d_loss_real, d_loss_fake,
-                              g_loss, g_model, d_model, dataset,
+                              g_loss, acc_real, acc_fake, g_model, d_model, dataset,
                               latent_dim, batch_size,
                               current_epoch % checkpoint_every_epochs == 0)
 
