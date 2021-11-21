@@ -11,6 +11,6 @@ pip install matplotlib
 
 # training
 
-python model/train_gan.py --output_file test --batch_size 128 --checkpoint_every_epochs 1 --n_epochs 50
+python model/train_gan.py --output_file test --batch_size 256 --checkpoint_every_epochs 3 --n_epochs 150 --data_sampling BasicClassifier
 
 

@@ -58,13 +58,10 @@ def define_discriminator(in_shape=(IMG_HEIGHT, IMG_WIDTH, 4),
 def define_generator(latent_dim):
     """Define the standalone generator model."""
     model = Sequential()
-    n_nodes = 256 * 3 * 3
+    n_nodes = 128 * 6 * 6
     model.add(Dense(n_nodes, input_dim=latent_dim))
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((3, 3, 256)))
-    model.add(Conv2DTranspose(
-        128, (4, 4), strides=(2, 2), padding='same'))  # 6x6
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(Reshape((6, 6, 128)))    
     model.add(Conv2DTranspose(
         128, (4, 4), strides=(2, 2), padding='same'))  # 12x12
     model.add(LeakyReLU(alpha=0.2))
