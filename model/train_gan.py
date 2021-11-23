@@ -63,13 +63,13 @@ def define_generator(latent_dim):
     model.add(LeakyReLU(alpha=0.2))
     model.add(Reshape((3, 3, 256)))
     model.add(Conv2DTranspose(
-        128, (4, 4), strides=(2, 2), padding='same'))  # 6x6
+        128, (3, 3), strides=(2, 2), padding='same'))  # 6x6
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2DTranspose(
-        128, (4, 4), strides=(2, 2), padding='same'))  # 12x12
+        128, (3, 3), strides=(2, 2), padding='same'))  # 12x12
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2DTranspose(
-        128, (4, 4), strides=(2, 2), padding='same'))  # 24x24
+        64, (3, 3), strides=(2, 2), padding='same'))  # 24x24
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2D(4, (3, 3), activation='tanh', padding='same'))
     model.summary()
