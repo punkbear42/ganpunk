@@ -17,6 +17,10 @@ from tensorflow.keras.layers import Conv2DTranspose
 from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import Dropout
 from tensorflow.keras.utils import image_dataset_from_directory
+from tensorflow.keras.constraints import Constraint
+from tensorflow.keras.optimizers import RMSprop
+from tensorflow.keras import backend
+from tensorflow.keras.layers import BatchNormalization
 
 from imblearn.over_sampling import RandomOverSampler
 
@@ -26,30 +30,52 @@ from helper import generate_fake_samples, generate_latent_points, save_plot
 IMG_HEIGHT = 24
 IMG_WIDTH = 24
 
+# clip model weights to a given hypercube
+class ClipConstraint(Constraint):
+	# set clip value when initialized
+	def __init__(self, clip_value):
+		self.clip_value = clip_value
+
+	# clip model weights to hypercube
+	def __call__(self, weights):
+		return backend.clip(weights, -self.clip_value, self.clip_value)
+
+	# get the config
+	def get_config(self):
+		return {'clip_value': self.clip_value}
+
+# implementation of wasserstein loss
+def wasserstein_loss(y_true, y_pred):
+	return backend.mean(y_true * y_pred)
 
 def define_discriminator(in_shape=(IMG_HEIGHT, IMG_WIDTH, 4),
                          lr=0.0002, beta_1=0.5, dropout=0.4):
+    const = ClipConstraint(0.01)
     """Define the standalone discriminator model."""
     model = Sequential()
     # normal
     model.add(Conv2D(64, (3, 3), padding='same', input_shape=in_shape))
+    # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     # downsample
-    model.add(Conv2D(128, (3, 3), strides=(2, 2), padding='same'))
+    model.add(Conv2D(128, (3, 3), strides=(2, 2), padding='same', kernel_constraint=const))
+    # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     # downsample
-    model.add(Conv2D(128, (3, 3), strides=(2, 2), padding='same'))
+    model.add(Conv2D(128, (3, 3), strides=(2, 2), padding='same', kernel_constraint=const))
+    # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     # downsample
-    model.add(Conv2D(256, (3, 3), strides=(2, 2), padding='same'))
+    model.add(Conv2D(256, (3, 3), strides=(2, 2), padding='same', kernel_constraint=const))
+    # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     # classifier
     model.add(Flatten())
     model.add(Dropout(dropout))
-    model.add(Dense(1, activation='sigmoid'))
+    model.add(Dense(1, activation='linear'))
     # compile model
-    opt = Adam(lr=lr, beta_1=beta_1)
-    model.compile(loss='binary_crossentropy',
+    opt = RMSprop(lr=0.00005)
+    model.compile(loss=wasserstein_loss,
                   optimizer=opt, metrics=['accuracy'])
     model.summary()
     return model
@@ -64,9 +90,11 @@ def define_generator(latent_dim):
     model.add(Reshape((6, 6, 128)))    
     model.add(Conv2DTranspose(
         128, (4, 4), strides=(2, 2), padding='same'))  # 12x12
+    # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2DTranspose(
         128, (4, 4), strides=(2, 2), padding='same'))  # 24x24
+    # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2D(4, (3, 3), activation='tanh', padding='same'))
     model.summary()
@@ -85,8 +113,8 @@ def define_gan(g_model, d_model, lr=0.0002, beta_1=0.5):
     # add the discriminator
     model.add(d_model)
     # compile model
-    opt = Adam(lr=lr, beta_1=beta_1)
-    model.compile(loss='binary_crossentropy', optimizer=opt)
+    opt = RMSprop(lr=0.00005)
+    model.compile(loss=wasserstein_loss, optimizer=opt)
     return model
 
 
@@ -168,7 +196,7 @@ def generate_real_samples(dataset, n_samples):
 	# generate 'real' class labels (1)
 
 	
-    y = ones((n_samples, 1))
+    y = -ones((n_samples, 1))
 	
     return X, y
 
@@ -201,7 +229,7 @@ def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss, 
 
 
 def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
-          n_epochs, batch_size, checkpoint_every_epochs=50):
+          n_epochs, batch_size, checkpoint_every_epochs=50, n_update_critic=5):
     """Train the generator and discriminator."""
     
     with open(f'{output_file}_training.txt', 'w') as file:
@@ -216,26 +244,27 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
                 
         for current_batch in range(batch_per_epoch):
 
-            X_fake, y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
-            
-            X_real, y_real = generate_real_samples(dataset, half_batch)
-            # normalize
-            X_real = (X_real - 127.5) / 127.5  # -1, 1
-        
+            for update_critic in range(n_update_critic):
 
-            # update discriminator model weights
-            d_loss_real, acc_real = d_model.train_on_batch(X_real, y_real)
-            d_loss_fake, acc_fake = d_model.train_on_batch(X_fake, y_fake)
+                X_fake, y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
+            
+                X_real, y_real = generate_real_samples(dataset, half_batch)
+                # normalize
+                X_real = (X_real - 127.5) / 127.5  # -1, 1
+                # update discriminator model weights
+                d_loss_real, acc_real = d_model.train_on_batch(X_real, y_real)
+                d_loss_fake, acc_fake = d_model.train_on_batch(X_fake, y_fake)
+
             # prepare points in latent space as input for the generator
             X_gan = generate_latent_points(latent_dim, batch_size)
             # create inverted labels for the fake samples
-            y_gan = ones((batch_size, 1))
+            y_gan = -ones((batch_size, 1))
             # update the generator via the discriminator's error
             g_loss = gan_model.train_on_batch(X_gan, y_gan)
             # summarize loss on this batch
-            print('epoch=%d, batch=%d, d_real=%.3f, d_fake=%.3f, g=%.3f' %
+            print('epoch=%d, batch=%d, d_real=%.3f, d_fake=%.3f, g=%.3f, d_acc_real=%.3f, d_acc_fake=%.3f' %
                 (current_epoch + 1, current_batch + 1, d_loss_real,
-                d_loss_fake, g_loss))
+                d_loss_fake, g_loss, acc_real, acc_fake))
         
         summarize_performance(output_file, current_epoch,
                               d_loss_real, d_loss_fake,
@@ -258,6 +287,7 @@ def parse_args():
     parser.add_argument("--latent_dimensions", type=int, default=100)
     parser.add_argument("--checkpoint_every_epochs", type=int, default=50)
     parser.add_argument("--n_epochs", type=int, default=1000)
+    parser.add_argument("--n_update_critic", type=int, default=5)
     parser.add_argument("--data_sampling", type=str, default="", choices=['RandomOverSampler', 'BasicClassifier'])
 
     return parser.parse_args()
@@ -280,4 +310,4 @@ if __name__ == '__main__':
     # train model
     train(args.output_file, g_model, d_model, gan_model, dataset,
           args.latent_dimensions, args.n_epochs, args.batch_size,
-          args.checkpoint_every_epochs)
+          args.checkpoint_every_epochs, args.n_update_critic)
