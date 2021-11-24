@@ -1,5 +1,5 @@
 from numpy.random import randn
-from numpy import zeros
+from numpy import ones
 from numpy import tile
 from matplotlib import pyplot
 
@@ -59,7 +59,7 @@ def generate_fake_samples(g_model, latent_dim, n_samples):
     # predict outputs
     X = g_model.predict(x_input)
 
-    y = zeros((n_samples, 1))
+    y = ones((n_samples, 1))
     return X, y
 
 
@@ -70,5 +70,5 @@ def generate_similar_fake_samples(g_model, latent_dim, n_samples):
     # predict outputs
     X = g_model.predict(x_input)
 
-    y = zeros((n_samples, 1))
+    y = ones((n_samples, 1))
     return X, y
