@@ -32,7 +32,7 @@ contract GanPunks is ERC721, Ownable {
     
     /*
         minting is allowed only every "minMintPeriod" block.
-        first nft is minted for the spender
+        first nft is minted to the sender
         the two others are minted to the contract, which will immediately free them to an auction.
     */
     function safeMint(int[100][3] calldata _inputs) public {
