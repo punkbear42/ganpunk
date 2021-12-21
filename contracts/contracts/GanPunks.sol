@@ -30,6 +30,11 @@ contract GanPunks is ERC721, Ownable {
         minExtendedMint = 5;
     }
     
+    /*
+        minting is allowed only every "minMintPeriod" block.
+        first nft is minted for the spender
+        the two others are minted to the contract, which will immediately free them to an auction.
+    */
     function safeMint(int[100][3] calldata _inputs) public {
         require(block.number - mintPeriod[msg.sender] > minMintPeriod, "the minimum period between minting hasn't been reached"); // minting is only allowed every minMintPeriod blocks.
         mint(_inputs[0], msg.sender);
