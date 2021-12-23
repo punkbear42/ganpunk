@@ -16,7 +16,17 @@ from tensorflow.keras.layers import Conv2D
 from tensorflow.keras.layers import Conv2DTranspose
 from tensorflow.keras.layers import LeakyReLU
 from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.utils import image_dataset_from_directory
+
+data_augmentation = False
+
+try:
+    from DiffAugment_tf import DiffAugment
+    data_augmentation = True
+    print("DiffAugment in PYTHONPATH, will use data augmentation")
+except:
+    print("DiffAugment not in PYTHONPATH, can't use data augmentation")
 
 from imblearn.over_sampling import RandomOverSampler
 
@@ -28,21 +38,41 @@ IMG_WIDTH = 24
 
 
 def define_discriminator(in_shape=(IMG_HEIGHT, IMG_WIDTH, 4),
-                         lr=0.0002, beta_1=0.5, dropout=0.4):
+                         lr=0.0002, beta_1=0.5, dropout=0.4,
+                         batch_norm=True,
+                         dropout_every_layer=True):
     """Define the standalone discriminator model."""
     model = Sequential()
     # normal
     model.add(Conv2D(64, (3, 3), padding='same', input_shape=in_shape))
+    if batch_norm:
+        model.add(BatchNormalization(momentum=0.8))
     model.add(LeakyReLU(alpha=0.2))
+    if dropout_every_layer:
+        model.add(Dropout(dropout))
+
     # downsample
     model.add(Conv2D(128, (3, 3), strides=(2, 2), padding='same'))
+    if batch_norm:
+        model.add(BatchNormalization(momentum=0.8))
     model.add(LeakyReLU(alpha=0.2))
-    # downsample
-    model.add(Conv2D(128, (3, 3), strides=(2, 2), padding='same'))
-    model.add(LeakyReLU(alpha=0.2))
+    if dropout_every_layer:
+        model.add(Dropout(dropout))
+
     # downsample
     model.add(Conv2D(256, (3, 3), strides=(2, 2), padding='same'))
+    if batch_norm:
+        model.add(BatchNormalization(momentum=0.8))
     model.add(LeakyReLU(alpha=0.2))
+    if dropout_every_layer:
+        model.add(Dropout(dropout))
+
+    # downsample
+    model.add(Conv2D(512, (3, 3), strides=(2, 2), padding='same'))
+    if batch_norm:
+        model.add(BatchNormalization(momentum=0.8))
+    model.add(LeakyReLU(alpha=0.2))
+
     # classifier
     model.add(Flatten())
     model.add(Dropout(dropout))
@@ -55,21 +85,26 @@ def define_discriminator(in_shape=(IMG_HEIGHT, IMG_WIDTH, 4),
     return model
 
 
-def define_generator(latent_dim):
+def define_generator(latent_dim, batch_norm=True):
     """Define the standalone generator model."""
     model = Sequential()
-    n_nodes = 256 * 3 * 3
+    n_nodes = 256 * 6 * 6
     model.add(Dense(n_nodes, input_dim=latent_dim))
+    if batch_norm:
+        model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
-    model.add(Reshape((3, 3, 256)))
-    model.add(Conv2DTranspose(
-        128, (3, 3), strides=(2, 2), padding='same'))  # 6x6
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(Reshape((6, 6, 256)))
     model.add(Conv2DTranspose(
         128, (3, 3), strides=(2, 2), padding='same'))  # 12x12
+
+    if batch_norm:
+        model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2DTranspose(
-        64, (3, 3), strides=(2, 2), padding='same'))  # 24x24
+        128, (3, 3), strides=(2, 2), padding='same'))  # 24x24
+
+    if batch_norm:
+        model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Conv2D(4, (3, 3), activation='tanh', padding='same'))
     model.summary()
@@ -162,17 +197,19 @@ def load_punks(batch_size, data_sampling=""):
     return train_data
 
 def generate_real_samples(dataset, n_samples):
-	# choose random instances
+    # choose random instances
     ix = randint(0, dataset.shape[0], n_samples)
     
     # retrieve selected images
     X = dataset[ix]
 
-	# generate 'real' class labels (1)
+    if data_augmentation:
+        X = DiffAugment(X)
+    # generate 'real' class labels (1)
 
-	
+    
     y = ones((n_samples, 1))
-	
+    
     return X, y
 
 def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss, acc_real, acc_fake,
