@@ -19,7 +19,14 @@ from tensorflow.keras.layers import Dropout
 from tensorflow.keras.layers import BatchNormalization
 from tensorflow.keras.utils import image_dataset_from_directory
 
-from DiffAugment_tf import DiffAugment
+data_augmentation = False
+
+try:
+    from DiffAugment_tf import DiffAugment
+    data_augmentation = True
+    print("DiffAugment in PYTHONPATH, will use data augmentation")
+except:
+    print("DiffAugment not in PYTHONPATH, can't use data augmentation")
 
 from imblearn.over_sampling import RandomOverSampler
 
@@ -196,7 +203,8 @@ def generate_real_samples(dataset, n_samples):
     # retrieve selected images
     X = dataset[ix]
 
-    X = DiffAugment(X)
+    if data_augmentation:
+        X = DiffAugment(X)
     # generate 'real' class labels (1)
 
     

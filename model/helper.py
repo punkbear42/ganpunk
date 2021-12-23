@@ -3,7 +3,15 @@ from numpy import zeros
 from numpy import tile
 from matplotlib import pyplot
 
-from DiffAugment_tf import DiffAugment
+data_augmentation = False
+
+try:
+    from DiffAugment_tf import DiffAugment
+    data_augmentation = True
+    print("DiffAugment in PYTHONPATH, will use data augmentation")
+except:
+    print("DiffAugment not in PYTHONPATH, can't use data augmentation")
+    
 
 def save_plot(examples, n, epoch=-1, base_file_name='results/generated_plot'):
     """Create and save a plot of generated images (reversed grayscale)"""
@@ -57,7 +65,10 @@ def generate_fake_samples(g_model, latent_dim, n_samples):
     """Use the generator to generate n fake examples, with class labels."""
     # generate points in latent space
     x_input = generate_latent_points(latent_dim, n_samples)
-    x_input = DiffAugment(x_input)
+    
+    if data_augmentation:
+        x_input = DiffAugment(x_input)
+
     # predict outputs
     X = g_model.predict(x_input)
 
