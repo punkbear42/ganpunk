@@ -4,10 +4,11 @@ pragma solidity ^0.8.2;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract GanPunks is ERC721, ERC721Enumerable, Ownable {
+contract GanPunks is ERC721, ERC721Enumerable, Ownable, IERC721Receiver {
     using Counters for Counters.Counter;
 
     Counters.Counter private _tokenIdCounter;
@@ -83,5 +84,13 @@ contract GanPunks is ERC721, ERC721Enumerable, Ownable {
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
+    }
+
+    function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data)
+        public
+        override(IERC721Receiver)
+        returns (bytes4)
+    {
+
     }
 }
