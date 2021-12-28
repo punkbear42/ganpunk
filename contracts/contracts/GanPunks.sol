@@ -91,6 +91,6 @@ contract GanPunks is ERC721, ERC721Enumerable, Ownable, IERC721Receiver {
         override(IERC721Receiver)
         returns (bytes4)
     {
-
+        return this.onERC721Received.selector;
     }
 }
