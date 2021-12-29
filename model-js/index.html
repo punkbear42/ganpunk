@@ -13,19 +13,19 @@
         window.onload = () => {
             (async () => {
                 const model = await tf.loadLayersModel('./model.json');
-                function getRandomIntInclusive(min, max) {
-                    min = Math.ceil(min);
-                    max = Math.floor(max);
-                    return Math.random() * (max - min + 1) + min //The maximum is inclusive and the minimum is inclusive
-                }
+                function randn_bm() {
+		    var u = 0, v = 0;
+		    while(u === 0) u = Math.random();
+		    while(v === 0) v = Math.random();
+		    return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+		}
                 
                 let input = []
                 for (let k = 0 ; k < 100; k++) {
-                    input.push(getRandomIntInclusive(-10, 10))
+                    input.push(randn_bm())
                 }
 
                 const prediction = model.predict(tf.tensor([input]));
-                        
 
                 const data = prediction.dataSync()
                 
@@ -38,13 +38,8 @@
                 var imgData = new ImageData(Uint8ClampedArray.from(data), 24, 24)
                 
                 ctx.putImageData(imgData, 0, 0);
-
-                
             })()
         }
-        
-      
-
     </script>
     </head>
 
