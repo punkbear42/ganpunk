@@ -57,7 +57,6 @@ def generate_similar_latent_points(latent_dim, n_samples):
 
     # reshape into a batch of inputs for the network
     x_input = x_input.reshape(n_samples, latent_dim)
-    print(x_input)
     return x_input
 
 
