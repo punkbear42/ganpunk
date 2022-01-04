@@ -1,12 +1,16 @@
+import argparse
+import os
+
 from numpy import ones
 from matplotlib import pyplot
-import argparse
-import numpy
+
 import tensorflow as tf
 print('version tensorflow')
 print(tf.version.VERSION)
+
 from numpy.random import rand
 from numpy.random import randint
+
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense
@@ -142,46 +146,23 @@ def show_dataset(train_data):
             break
 
 
-def load_punks(batch_size, data_sampling=""):
-    if data_sampling == "":
-        # raw 10.000 are being loaded
-        train_data = image_dataset_from_directory(
-            './punks',
-            label_mode=None,
-            seed=123,
-            image_size=(IMG_HEIGHT, IMG_WIDTH),
-            batch_size=10000,
-            color_mode='rgba')
+def load_punks(data_sampling="", dataset_folder='./punks',
+               has_labels=False):
+    # raw 10.000 are being loaded
+    train_data = image_dataset_from_directory(
+        dataset_folder,
+        labels=None if not has_labels else 'inferred', 
+        label_mode=None if not has_labels else 'int',
+        seed=123,
+        image_size=(IMG_HEIGHT, IMG_WIDTH),
+        batch_size=30000000,  # batches are handled later
+        color_mode='rgba')
+    if not has_labels:
         train_data = next(iter(train_data)).numpy()
-
-    elif data_sampling == "BasicClassifier":
-        # classified punks are being loaded,
-        # punks are duplicated over multiple classes
-        # e.g a single punk can be found in the class "bear" and in the class "beanie".
-        train_data = image_dataset_from_directory(
-            './punks-classified',
-            labels='inferred',
-            label_mode='int',
-            seed=123,
-            image_size=(IMG_HEIGHT, IMG_WIDTH),
-            batch_size=30000000, # very high number so everything get into one batch
-            color_mode='rgba')
-        train_data = next(iter(train_data))
-        train_data = train_data[0].numpy()
-
-    elif data_sampling == "RandomOverSampler":
-        # same as BasicClassifier
-        # + RandomOverSampler: e.g it fixes imbalanced class (e.g if the class "bear" and "beanie" are imbalanced)
-        train_data = image_dataset_from_directory(
-            './punks-classified',
-            labels='inferred',
-            label_mode='int',
-            seed=123,
-            image_size=(IMG_HEIGHT, IMG_WIDTH),
-            batch_size=30000000, # very high number so everything get into one batch
-            color_mode='rgba')
+    else:
         train_data = next(iter(train_data))
 
+    if data_sampling == "RandomOverSampler":
         data_punks = train_data[0].numpy()
         label_punks = train_data[1].numpy()
 
@@ -191,10 +172,12 @@ def load_punks(batch_size, data_sampling=""):
             data_punks.shape[0], IMG_HEIGHT * IMG_WIDTH * 4)
         train_data, _ = sm.fit_resample(reshaped, label_punks)
         train_data = train_data.reshape(-1, IMG_HEIGHT, IMG_WIDTH, 4)
-    
-    print(f'samples: {train_data.shape[0]}')
+    elif has_labels:        
+        train_data = train_data[0].numpy()
 
+    print(f'samples: {train_data.shape[0]}')
     return train_data
+
 
 def generate_real_samples(dataset, n_samples):
     # choose random instances
@@ -212,9 +195,9 @@ def generate_real_samples(dataset, n_samples):
     
     return X, y
 
-def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake, g_loss, acc_real, acc_fake,
-                          g_model, d_model, dataset, latent_dim, n_samples,
-                          save_model=False):
+def summarize_performance(output_file, epoch, d_loss_real, d_loss_fake,
+                          g_loss, acc_real, acc_fake, g_model, d_model,
+                          dataset, latent_dim, n_samples, save_model=False):
     # prepare real samples
     # X_real, y_real = generate_real_samples(dataset, n_samples)
     # evaluate discriminator on real examples
@@ -246,7 +229,9 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
     
     with open(f'{output_file}_training.txt', 'w') as file:
         file.write(
-            'Epoch,Discriminator loss,Discriminator loss (Real),Discriminator loss (Fake),Generator loss,Accuracy real,Accuracy fake\n')
+            'Epoch,Discriminator loss,Discriminator loss (Real),'
+            'Discriminator loss (Fake),Generator loss,'
+            'Accuracy real,Accuracy fake\n')
 
     half_batch = int(batch_size / 2)
     batch_per_epoch = int(dataset.shape[0] / batch_size)
@@ -256,12 +241,12 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
                 
         for current_batch in range(batch_per_epoch):
 
-            X_fake, y_fake = generate_fake_samples(g_model, latent_dim, half_batch)
+            X_fake, y_fake = generate_fake_samples(g_model, latent_dim,
+                                                   half_batch)
             
             X_real, y_real = generate_real_samples(dataset, half_batch)
             # normalize
             X_real = (X_real - 127.5) / 127.5  # -1, 1
-        
 
             # update discriminator model weights
             d_loss_real, acc_real = d_model.train_on_batch(X_real, y_real)
@@ -279,8 +264,8 @@ def train(output_file, g_model, d_model, gan_model, dataset, latent_dim,
         
         summarize_performance(output_file, current_epoch,
                               d_loss_real, d_loss_fake,
-                              g_loss, acc_real, acc_fake, g_model, d_model, dataset,
-                              latent_dim, batch_size,
+                              g_loss, acc_real, acc_fake, g_model, d_model,
+                              dataset, latent_dim, batch_size,
                               current_epoch % checkpoint_every_epochs == 0)
 
 
@@ -294,11 +279,13 @@ def parse_args():
                              "classification performance.")
     parser.add_argument("--batch_size", default=256, type=int)
     parser.add_argument("--learning_rate", default=0.0002, type=float)
+    parser.add_argument("--dataset_folder", default='./punks')
     parser.add_argument("--beta_1", default=0.5, type=float)
     parser.add_argument("--latent_dimensions", type=int, default=100)
     parser.add_argument("--checkpoint_every_epochs", type=int, default=50)
     parser.add_argument("--n_epochs", type=int, default=1000)
-    parser.add_argument("--data_sampling", type=str, default="", choices=['RandomOverSampler', 'BasicClassifier'])
+    parser.add_argument("--data_sampling", type=str, default="",
+                        choices=['RandomOverSampler'])
 
     return parser.parse_args()
 
@@ -315,8 +302,12 @@ if __name__ == '__main__':
     gan_model = define_gan(g_model, d_model, lr=args.learning_rate,
                            beta_1=args.beta_1)
 
+    has_labels = any([os.path.isdir(os.path.join(args.dataset_folder, f))
+                      for f in os.listdir(args.dataset_folder)])
+    print(f'Dataset folder has subfolders with labels: {has_labels}')
+
     # load image data
-    dataset = load_punks(args.batch_size, args.data_sampling)
+    dataset = load_punks(args.data_sampling, args.dataset_folder, has_labels)
     # train model
     train(args.output_file, g_model, d_model, gan_model, dataset,
           args.latent_dimensions, args.n_epochs, args.batch_size,

@@ -33,6 +33,9 @@
                 const ctx = canvas.getContext('2d');
                 for (var i = 0; i < data.length; i++) {                
                     data[i] = ((data[i] + 1) / 2) * 255
+		    if(data[i] < 2) {
+			data[i] = 128;
+		    }
                 }
                 
                 var imgData = new ImageData(Uint8ClampedArray.from(data), 24, 24)
