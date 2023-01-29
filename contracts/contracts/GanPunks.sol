@@ -1,62 +1,58 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.2;
+pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/interfaces/IQuoter.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract GanPunks is ERC721, ERC721Enumerable, Ownable, IERC721Receiver {
-    using Counters for Counters.Counter;
+contract MyToken is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable {    
+    ISwapRouter public constant uniswapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
+    IQuoter public constant quoter = IQuoter(0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6);
+    address private constant multiDaiKovan = 0x4F96Fe3b7A6Cf9725f59d353F723c1bDb64CA6Aa;
+    address private constant WETH9 = 0xd0A1E359811322d97991E03f863a0C30C2cF029C;
 
-    Counters.Counter private _tokenIdCounter;
+    mapping (bytes32 => address) public hashedLatentSpace;
+    mapping (uint256 => string[100]) public latentSpaces;
 
-    /*
-        configuration
-    */
-    uint minMintPeriod;
-    uint minExtendedMint;
-    
-    /*
-        state
-    */
-    mapping (bytes32 => address) hashedLatentSpace;
-    mapping (uint256 => string[100]) latentSpaces;
-    mapping (address => uint) mintPeriod;
-    mapping (address => uint) nbMintedToken;
-     
-    constructor() ERC721("GanPunks", "GANPUNK") {
-        minMintPeriod = 10;
-        minExtendedMint = 5;
-    }
-    
-    /*
-        minting is allowed only every "minMintPeriod" block.
-        first nft is minted for the spender
-        the two others are minted to the contract, which will immediately free them to an auction.
-    */
-    function safeMint(string[100][3] calldata _inputs) public {
-        require(block.number - mintPeriod[msg.sender] > minMintPeriod, "the minimum period between minting hasn't been reached"); // minting is only allowed every minMintPeriod blocks.
-        mint(_inputs[0], msg.sender);
-        if (nbMintedToken[msg.sender] > minExtendedMint) { // extra minting is allowed after minExtendedMint mints.
-            mint(_inputs[1], address(this));
-            mint(_inputs[2], address(this));
-        }
-        mintPeriod[msg.sender] = block.number;
+    uint creationCostInDai = 50;
+
+    address payable safe;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
-    function mint(string[100] memory _input, address _to) private {
+    function initialize() initializer public {
+        __ERC721_init("GanPunk", "GPunk");
+        __Ownable_init();
+        __UUPSUpgradeable_init();
+    }
+
+    function _authorizeUpgrade(address newImplementation)
+        internal
+        onlyOwner
+        override
+    {}
+
+    function setSafe(address payable _safe) public onlyOwner {
+        safe = _safe;
+    }
+
+    function mint(string[100] memory _input, address _to, uint256 tokenId) public payable {
+        uint cost = getEstimatedETHforDAI(creationCostInDai);
+        require(cost == msg.value, "estimated ETH doesn't match");
+        require(safe != address(0), "safe not set");
+        require(safe.send(msg.value), "failed forwarding payment");
         bytes32 hashedInput = keccak256(abi.encode(_input));
-        if (hashedLatentSpace[hashedInput] != address(0)) return;
+        require(hashedLatentSpace[hashedInput] != address(0), "input already assigned");
 
-        uint256 tokenId = _tokenIdCounter.current();
-        _tokenIdCounter.increment();
         _safeMint(_to, tokenId);
         latentSpaces[tokenId] = _input;
-        nbMintedToken[_to]++;
-        hashedLatentSpace[hashedInput] = _to;
+        hashedLatentSpace[hashedInput] = _to;        
     }
 
     function latentSpaceOf(uint tokenId) public view returns (string[100] memory) {
@@ -68,29 +64,18 @@ contract GanPunks is ERC721, ERC721Enumerable, Ownable, IERC721Receiver {
         return hashedLatentSpace[keccak256(abi.encodePacked(_input))];
     }
 
-    // The following functions are overrides required by Solidity.
+    function getEstimatedETHforDAI(uint daiAmount) public returns (uint256) {
+        address tokenIn = WETH9;
+        address tokenOut = multiDaiKovan;
+        uint24 fee = 500;
+        uint160 sqrtPriceLimitX96 = 0;
 
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId)
-        internal
-        override(ERC721, ERC721Enumerable)
-    {
-        super._beforeTokenTransfer(from, to, tokenId);
-    }
-
-    function supportsInterface(bytes4 interfaceId)
-        public
-        view
-        override(ERC721, ERC721Enumerable)
-        returns (bool)
-    {
-        return super.supportsInterface(interfaceId);
-    }
-
-    function onERC721Received(address operator, address from, uint256 tokenId, bytes memory data)
-        public
-        override(IERC721Receiver)
-        returns (bytes4)
-    {
-        return this.onERC721Received.selector;
+        return quoter.quoteExactOutputSingle(
+            tokenIn,
+            tokenOut,
+            fee,
+            daiAmount,
+            sqrtPriceLimitX96
+        );
     }
 }
