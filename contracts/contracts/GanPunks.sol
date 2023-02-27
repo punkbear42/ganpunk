@@ -11,16 +11,21 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "hardhat/console.sol";
 
 contract GanPunk is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUpgradeable {    
-    // ISwapRouter public constant uniswapRouter = ISwapRouter(0xE592427A0AEce92De3Edee1F18E0157C05861564);
     IQuoter public constant quoter = IQuoter(0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6);
     address private constant DAI = 0x6B175474E89094C44Da98b954EedeAC495271d0F;
     address private constant WETH9 = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
 
-    mapping (bytes32 => address) public hashedLatentSpace;
-    mapping (uint256 => string[100]) public latentSpaces;
+    struct data {
+        bytes model;
+        bytes latentSpace;
+    }
 
+    mapping (bytes32 => bool) public latentSpaceHashes; // hash of the latent space => token_id
+    mapping (uint256 => data) public datas; // token_id => {model, latentSpace}
+    mapping (bytes => address) public modelOwner; // model_ipfs_hash => owner
     uint creationCostInDai;
-
+    uint modelOwnerPercent;
+    uint safePercent;
     address payable safe;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -33,6 +38,8 @@ contract GanPunk is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         __Ownable_init();
         __UUPSUpgradeable_init();
         creationCostInDai = 50;
+        modelOwnerPercent = 60;
+        safePercent = 40;
     }
 
     function _authorizeUpgrade(address newImplementation)
@@ -45,25 +52,38 @@ contract GanPunk is Initializable, ERC721Upgradeable, OwnableUpgradeable, UUPSUp
         safe = _safe;
     }
 
-    function mint(string[100] memory _input, address _to, uint256 tokenId) public payable {
-        require(0 != msg.value, "value is set to 0");
-        require(safe != address(0), "safe not set");
-        require(safe.send(msg.value), "failed forwarding payment");
-        bytes32 hashedInput = keccak256(abi.encode(_input));
-        require(hashedLatentSpace[hashedInput] == address(0), "input already assigned");
+    function setModelOwnerPercent(uint percent) public onlyOwner  {
+        modelOwnerPercent = percent;
+    }
+
+    function setSafePercent(uint percent) public onlyOwner  {
+        safePercent = percent;
+    }
+
+    function setModel(bytes calldata _model) public {
+        require(modelOwner[_model] == address(0), "model shouldn't be already set");
+        modelOwner[_model] = msg.sender;
+    }
+
+    function mint(bytes memory _model, bytes memory _input, address _to, uint256 tokenId) public payable {
+        bytes32 latentSpaceHash = keccak256(abi.encode(_model, _input));
+        require(msg.value != 0, "value is set to 0");
+        require(latentSpaceHashes[latentSpaceHash] == false, "latent space already used");
+        if (safe != address(0)) {
+            safe.transfer(msg.value * safePercent / 100);
+        }
+        if (modelOwner[_model] != address(0)) {
+            payable(modelOwner[_model]).transfer(msg.value * modelOwnerPercent / 100);
+        }
 
         _safeMint(_to, tokenId);
-        latentSpaces[tokenId] = _input;
-        hashedLatentSpace[hashedInput] = _to;        
+        datas[tokenId] = data(_model, _input);
+        latentSpaceHashes[latentSpaceHash] = true;
     }
 
-    function latentSpaceOf(uint tokenId) public view returns (string[100] memory) {
+    function dataOf(uint tokenId) public view returns (data memory) {
         require(_exists(tokenId), "token does not exist");
-        return latentSpaces[tokenId];
-    }
-
-    function latentSpaceOwner(string[100] calldata _input) public view returns (address) {
-        return hashedLatentSpace[keccak256(abi.encode(_input))];
+        return datas[tokenId];
     }
 
     function getEstimatedETHforDAI(uint daiAmount) public returns (uint256) {
